@@ -1,0 +1,430 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Student Budget — Simple Frontend</title>
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    :root{
+      --bg:#fff7fb;
+      --card:#ffffff;
+      --accent:#ff6b81;
+      --accent-2:#ffd166;
+      --muted:#666;
+      --success:#38b000;
+      --danger:#ef476f;
+      --shadow: 0 8px 20px rgba(0,0,0,0.06);
+      --radius:14px;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      background: linear-gradient(180deg, #fff7fb 0%, #f2f9ff 100%);
+      min-height:100vh;
+      color:#111;
+      padding:28px;
+    }
+
+    header{display:flex;align-items:center;gap:16px;margin-bottom:22px}
+    header h1{margin:0;font-size:20px;color:var(--accent);letter-spacing:0.6px}
+    nav{margin-left:auto;display:flex;gap:8px}
+    .btn{
+      background:var(--accent); color:white; border:none; padding:10px 14px; border-radius:10px; cursor:pointer;
+      font-weight:600; box-shadow:var(--shadow);
+    }
+    .btn.ghost{background:transparent;color:var(--accent);border:2px solid rgba(255,107,129,0.12)}
+    .container{display:grid;grid-template-columns: 360px 1fr; gap:20px; align-items:start}
+
+    /* left column - forms */
+    .card{background:var(--card);border-radius:var(--radius);padding:18px;box-shadow:var(--shadow)}
+    label{display:block;font-size:13px;color:var(--muted);margin-bottom:6px}
+    input[type="number"], input[type="date"], input[type="text"], select, input[type="month"]{
+      width:100%; padding:10px;border-radius:10px;border:1px solid #eee;margin-bottom:12px;font-size:14px;
+    }
+    .big-cta{display:block;width:100%;padding:12px;border-radius:12px;border:0;font-weight:700}
+
+    /* dashboard (right) */
+    .grid-2{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:12px}
+    .stat{padding:14px;border-radius:12px;background:linear-gradient(180deg,#fff,#fff);text-align:left}
+    .stat h3{margin:0;font-size:13px;color:var(--muted)}
+    .stat p{margin:6px 0 0;font-size:20px;font-weight:700}
+
+    .banner{padding:12px;border-radius:10px;background:linear-gradient(90deg,#fff6f6,#fff);border:1px solid rgba(239,71,111,0.08);display:flex;gap:12px;align-items:center}
+    .small{font-size:13px;color:var(--muted)}
+
+    footer{margin-top:18px;color:var(--muted);font-size:13px}
+
+    /* responsive */
+    @media (max-width:900px){
+      .container{grid-template-columns: 1fr; padding-bottom:40px}
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='34' height='34'><rect rx='8' width='34' height='34' fill='%23ffd166'/><text x='50%' y='58%' font-size='18' text-anchor='middle' fill='%23ff6b81' font-family='Arial' font-weight='700'>$</text></svg>" alt="logo" style="width:40px;height:40px;border-radius:9px;box-shadow:var(--shadow)">
+    <h1>Student Budget</h1>
+    <nav>
+      <button class="btn" onclick="showSection('set')">Set Budget</button>
+      <button class="btn ghost" onclick="showSection('add')">Add Expense</button>
+      <button class="btn ghost" onclick="showSection('dash')">Dashboard</button>
+    </nav>
+  </header>
+
+  <main class="container">
+    <!-- LEFT: forms -->
+    <div style="display:flex;flex-direction:column;gap:16px">
+      <!-- Set Budget -->
+      <div id="set" class="card">
+        <h2 style="margin-top:0">Set Monthly Budget</h2>
+        <label>Month</label>
+        <input type="month" id="budget-month" />
+        <label>Total budget (₹)</label>
+        <input type="number" id="budget-amount" min="0" step="0.01" placeholder="e.g. 8000" />
+        <label>Saving goal (₹)</label>
+        <input type="number" id="budget-saving" min="0" step="0.01" placeholder="e.g. 1000" />
+        <button class="big-cta btn" onclick="saveBudget()">Save Budget</button>
+        <p class="small" style="margin-top:8px">Tip: set the month and saving goal so the app can compute your daily limit.</p>
+      </div>
+
+      <!-- Add Expense -->
+      <div id="add" class="card" style="display:none">
+        <h2 style="margin-top:0">Add Expense</h2>
+        <label>Expense name</label>
+        <input type="text" id="expense-name" placeholder="Coffee, Bus fare, etc." />
+        <label>Category</label>
+        <select id="expense-category">
+          <option value="food">Food</option>
+          <option value="fun">Fun</option>
+          <option value="stationary">Stationary</option>
+          <option value="others">Others</option>
+        </select>
+        <label>Amount (₹)</label>
+        <input type="number" id="expense-amount" min="0" step="0.01" placeholder="e.g. 50" />
+        <label>Date</label>
+        <input type="date" id="expense-date" />
+        <button class="big-cta btn" onclick="addExpense()">Add Expense</button>
+        <p class="small" style="margin-top:8px">Expenses are saved locally (localStorage) for demo purposes.</p>
+      </div>
+
+      <!-- Quick actions -->
+      <div class="card">
+        <h3 style="margin-top:0">Quick Actions</h3>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button class="btn" onclick="clearAll()">Clear All Data</button>
+          <button class="btn ghost" onclick="downloadBackup()">Download Backup</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: dashboard -->
+    <div>
+      <div id="alert-banner" style="display:none;margin-bottom:12px"></div>
+
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <h2 style="margin:0">Dashboard</h2>
+          <div class="small">Today: <span id="today"></span></div>
+        </div>
+
+        <div class="grid-2" style="margin-top:12px">
+          <div class="stat">
+            <h3>Total budget</h3>
+            <p id="stat-budget">—</p>
+          </div>
+          <div class="stat">
+            <h3>Saving goal</h3>
+            <p id="stat-saving">—</p>
+          </div>
+
+          <div class="stat">
+            <h3>Total spent (this month)</h3>
+            <p id="stat-spent">—</p>
+          </div>
+          <div class="stat">
+            <h3>Remaining</h3>
+            <p id="stat-remaining">—</p>
+          </div>
+
+          <div class="stat">
+            <h3>Daily spending limit</h3>
+            <p id="stat-daily">—</p>
+          </div>
+          <div class="stat">
+            <h3>Days left</h3>
+            <p id="stat-days">—</p>
+          </div>
+        </div>
+
+        <div style="margin-top:14px">
+          <canvas id="catChart" height="120"></canvas>
+        </div>
+
+        <footer>
+          <div class="small">Spending by category — Food, Fun, Stationary, Others</div>
+        </footer>
+      </div>
+    </div>
+  </main>
+
+<script>
+/* -------------------------
+   Utilities & init
+   ------------------------- */
+const CATEGORIES = ['food','fun','stationary','others'];
+const categoryLabels = {food:'Food', fun:'Fun', stationary:'Stationary', others:'Others'};
+
+function $(id){return document.getElementById(id)}
+function currency(v){ return (Number(v) || 0).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2}) }
+
+function nowISODate(){ 
+  const d = new Date();
+  const yyyy = d.getFullYear(), mm = String(d.getMonth()+1).padStart(2,'0'), dd = String(d.getDate()).padStart(2,'0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+/* show today */
+$('today').textContent = nowISODate();
+
+/* Load saved values into set-budget form when available */
+function loadBudgetForm(){
+  const b = JSON.parse(localStorage.getItem('budget')||'null');
+  if(b){
+    // month input expects yyyy-mm
+    $('budget-month').value = b.month;
+    $('budget-amount').value = b.total;
+    $('budget-saving').value = b.saving;
+  } else {
+    // default to current month
+    const d = new Date();
+    $('budget-month').value = d.toISOString().slice(0,7);
+  }
+}
+loadBudgetForm();
+
+/* default expense date = today */
+$('expense-date').value = nowISODate();
+
+/* toggle sections */
+function showSection(id){
+  ['set','add','dash'].forEach(s => {
+    const el = $(s);
+    if(!el) return;
+    el.style.display = (s === id ? '' : 'none');
+  });
+  // always refresh dashboard when shown
+  if(id === 'dash') renderDashboard();
+}
+showSection('dash'); // open dashboard by default
+
+/* -------------------------
+   Budget functions
+   ------------------------- */
+function saveBudget(){
+  const month = $('budget-month').value;
+  const total = parseFloat($('budget-amount').value||0);
+  const saving = parseFloat($('budget-saving').value||0);
+  if(!month || isNaN(total) || total <= 0){
+    alert('Please enter a valid month and total budget.');
+    return;
+  }
+  const budget = {month, total: Number(total.toFixed(2)), saving: Number((saving||0).toFixed(2))};
+  localStorage.setItem('budget', JSON.stringify(budget));
+  alert('Budget saved!');
+  renderDashboard();
+}
+
+/* -------------------------
+   Expense functions
+   ------------------------- */
+function getExpenses(){
+  return JSON.parse(localStorage.getItem('expenses')||'[]');
+}
+function saveExpenses(arr){
+  localStorage.setItem('expenses', JSON.stringify(arr));
+}
+function addExpense(){
+  const name = $('expense-name').value.trim() || 'Expense';
+  const category = $('expense-category').value;
+  const amount = parseFloat($('expense-amount').value||0);
+  const date = $('expense-date').value;
+  if(isNaN(amount) || amount <= 0){
+    alert('Enter a valid amount.');
+    return;
+  }
+  if(!date){
+    alert('Choose a date.');
+    return;
+  }
+  const expenses = getExpenses();
+  expenses.push({id:Date.now(), name, category, amount: Number(amount.toFixed(2)), date});
+  saveExpenses(expenses);
+  // reset form partly
+  $('expense-name').value='';
+  $('expense-amount').value='';
+  $('expense-date').value = nowISODate();
+  alert('Expense added.');
+  renderDashboard();
+}
+
+/* -------------------------
+   Dashboard logic & chart
+   ------------------------- */
+let chartInstance = null;
+
+function startChart(ctx, labels, data){
+  if(chartInstance){ chartInstance.destroy(); chartInstance = null; }
+  chartInstance = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Spent (₹)',
+        data,
+        borderRadius: 8,
+        barPercentage: 0.6,
+      }]
+    },
+    options: {
+      responsive:true,
+      plugins:{legend:{display:false}},
+      scales:{
+        y:{beginAtZero:true, ticks:{precision:0}}
+      }
+    }
+  });
+}
+
+function renderDashboard(){
+  const budget = JSON.parse(localStorage.getItem('budget')||'null');
+  const expenses = getExpenses();
+
+  // figure the month we're considering: use selected budget.month if present and same-month; otherwise current month
+  const today = new Date();
+  const currentMonth = today.toISOString().slice(0,7); // yyyy-mm
+  const targetMonth = budget && budget.month ? budget.month : currentMonth;
+
+  // total expense THIS month (based on expense.date's yyyy-mm)
+  const totalExpense = expenses.reduce((sum,e)=>{
+    if(e.date && e.date.slice(0,7) === targetMonth) return sum + Number(e.amount || 0);
+    return sum;
+  }, 0);
+
+  const totalAmt = budget ? Number(budget.total): 0;
+  const savingGoal = budget ? Number(budget.saving): 0;
+  const remaining = Number((totalAmt - totalExpense).toFixed(2));
+
+  // days left in the target month (if targetMonth equals currentMonth). If targetMonth is a different month, compute for that month but treat 'today' as 1st.
+  let daysLeft;
+  const [y,m] = targetMonth.split('-').map(Number);
+  if(targetMonth === currentMonth){
+    const lastDay = new Date(today.getFullYear(), today.getMonth()+1, 0).getDate();
+    daysLeft = lastDay - today.getDate() + 1; // include today
+  } else {
+    // If user is viewing a different month, show full days of that month
+    const lastDay = new Date(y, m, 0).getDate(); // m is 1-based
+    daysLeft = lastDay;
+  }
+  if(daysLeft <= 0) daysLeft = 1;
+
+  // daily limit computed after reserving savingGoal
+  const availableForSpending = remaining - savingGoal;
+  const dailyLimit = availableForSpending > 0 ? Number((availableForSpending / daysLeft).toFixed(2)) : 0;
+
+  // spending by category for target month
+  const catSums = {};
+  CATEGORIES.forEach(c => catSums[c] = 0);
+  expenses.forEach(e => {
+    if(e.date && e.date.slice(0,7) === targetMonth){
+      catSums[e.category] = (catSums[e.category] || 0) + Number(e.amount || 0);
+    }
+  });
+
+  // render stats
+  $('stat-budget').textContent = totalAmt ? '₹ ' + currency(totalAmt) : '—';
+  $('stat-saving').textContent = savingGoal ? '₹ ' + currency(savingGoal) : '—';
+  $('stat-spent').textContent = '₹ ' + currency(totalExpense);
+  $('stat-remaining').textContent = '₹ ' + currency(remaining);
+  $('stat-daily').textContent = '₹ ' + currency(dailyLimit);
+  $('stat-days').textContent = String(daysLeft);
+
+  // chart
+  const ctx = document.getElementById('catChart').getContext('2d');
+  const labels = CATEGORIES.map(c => categoryLabels[c]);
+  const data = CATEGORIES.map(c => Number(catSums[c].toFixed(2)));
+  startChart(ctx, labels, data);
+
+  // over-budget check
+  const overBudget = totalExpense > (totalAmt - savingGoal);
+  showOverBudget(overBudget, totalExpense, totalAmt, savingGoal);
+
+  // store last-render snapshot (optional)
+  localStorage.setItem('lastSnapshot', JSON.stringify({
+    month: targetMonth, totalAmt, savingGoal, totalExpense, remaining, dailyLimit, timestamp: new Date().toISOString()
+  }));
+}
+
+/* -------------------------
+   Notifications & banner
+   ------------------------- */
+function showOverBudget(isOver, spent, totalAmt, savingGoal){
+  const banner = $('alert-banner');
+  if(isOver){
+    banner.style.display='';
+    banner.className = 'banner';
+    banner.innerHTML = `<div style="width:12px;height:12px;border-radius:50%;background:${getComputedStyle(document.documentElement).getPropertyValue('--danger')};"></div>
+      <div><strong style="color:var(--danger)">Budget alert</strong><div class="small">You've spent ₹ ${currency(spent)} which exceeds your available budget after saving goal (₹ ${currency(totalAmt - savingGoal || 0)}).</div></div>`;
+
+    // try browser notification
+    if(window.Notification && Notification.permission !== 'denied'){
+      if(Notification.permission === 'granted'){
+        new Notification('Budget alert — overspent', {body: `You are over your available budget for the month.`});
+      } else {
+        Notification.requestPermission().then(p => {
+          if(p === 'granted') new Notification('Budget alert — overspent', {body: `You are over your available budget for the month.`});
+        });
+      }
+    }
+  } else {
+    banner.style.display='none';
+    banner.innerHTML = '';
+  }
+}
+
+/* -------------------------
+   Quick actions
+   ------------------------- */
+function clearAll(){
+  if(confirm('Clear all saved budget and expenses? This cannot be undone.')) {
+    localStorage.removeItem('budget');
+    localStorage.removeItem('expenses');
+    renderDashboard();
+    alert('All data cleared.');
+  }
+}
+function downloadBackup(){
+  const payload = {
+    budget: JSON.parse(localStorage.getItem('budget')||'null'),
+    expenses: JSON.parse(localStorage.getItem('expenses')||'[]')
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'student_budget_backup.json';
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
+
+/* -------------------------
+   Start
+   ------------------------- */
+renderDashboard();
+
+</script>
+</body>
+</html>
